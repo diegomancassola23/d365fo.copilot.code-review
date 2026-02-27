@@ -4,7 +4,7 @@
     "id": "ado-copilot-code-review-dev",
     "name": "d365fo-copilot-code-review",
     "version": "1.1.1",
-    "publisher": "Diego Mancassola",
+    "publisher": "DiegoMancassola",
     "public": false,
     "targets": [
         {
