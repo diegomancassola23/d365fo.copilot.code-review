@@ -1,24 +1,26 @@
 {
-    "name": "ado-copilot-code-review",
+    "name": "d365fo-copilot-code-review",
     "version": "1.5.1",
-    "description": "Azure DevOps extension for automated code reviews using GitHub Copilot",
+    "description": "Azure DevOps extension for code reviews using GitHub Copilot over D365FO projects",
     "scripts": {
-        "build": "cd CopilotCodeReviewV1 && npm run build",
-        "build:dev": "cd CopilotCodeReviewV1 && npm run build",
+        "build": "cd d356foCodeReview && npm run build",
+        "build:dev": "cd d356foCodeReview && npm run build",
         "package:prod": "tfx extension create --manifest-globs vss-extension.json",
         "package:dev": "pwsh -File build-dev.ps1"
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/little-fort/ado-copilot-code-review.git"
+        "url": "https://github.com/diegomancassola23/d365fo.copilot.code-review.git"
     },
     "keywords": [
         "azure-devops",
         "copilot",
         "code-review",
         "pull-request",
-        "ai"
+        "ai",
+        "d365fo",
+        "x++"
     ],
-    "author": "LittleFortSoftware",
+    "author": "Diego Mancassola",
     "license": "GPL-3.0"
 }

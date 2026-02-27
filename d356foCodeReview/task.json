@@ -1,18 +1,18 @@
 {
     "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
     "id": "5fe45e88-c466-4658-ad2f-f6735e8a601f",
-    "name": "CopilotCodeReview",
-    "friendlyName": "Copilot Code Review",
+    "name": "d356foCodeReview",
+    "friendlyName": "D356FO Code Review",
     "description": "Perform automated code reviews on pull requests using the official GitHub Copilot CLI",
-    "helpMarkDown": "[Learn more about this task](https://github.com/little-fort/ado-copilot-code-review)",
+    "helpMarkDown": "[Learn more about this task](https://github.com/diegomancassola23/d365fo.copilot.code-review)",
     "category": "Utility",
-    "author": "LittleFortSoftware",
+    "author": "Diego Mancassola",
     "version": {
         "Major": 1,
         "Minor": 5,
         "Patch": 1
     },
-    "instanceNameFormat": "Copilot Code Review",
+    "instanceNameFormat": "D356FO Code Review",
     "minimumAgentVersion": "2.182.1",
     "inputs": [
         {

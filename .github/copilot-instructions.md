@@ -22,10 +22,10 @@ index.ts (orchestrator)
 
 ```powershell
 # Build TypeScript (from repo root)
-npm run build                     # Compiles CopilotCodeReviewV1/index.ts
+npm run build                     # Compiles d356foCodeReview/index.ts
 
 # Build dev extension for testing
-.\build-dev.ps1                   # Builds + copies to CopilotCodeReviewDevV1 + packages
+.\build-dev.ps1                   # Builds + copies to d356foCodeReviewDevV1 + packages
 .\build-dev.ps1 -SkipBuild        # Package only (uses existing compiled files)
 
 # Package for marketplace
@@ -33,7 +33,7 @@ npm run package:prod              # Creates .vsix from vss-extension.json
 npm run package:dev               # Creates dev .vsix from vss-extension.dev.json
 ```
 
-**Version Sync**: Update version in THREE places: `package.json`, `CopilotCodeReviewV1/package.json`, `CopilotCodeReviewV1/task.json`, and `vss-extension.json`.
+**Version Sync**: Update version in THREE places: `package.json`, `d356foCodeReview/package.json`, `d356foCodeReview/task.json`, and `vss-extension.json`.
 
 ## Code Patterns
 
@@ -60,8 +60,8 @@ function Write-Output-Line { ... }          # Dual output to console + file
 ```
 
 ### Prompt Customization
-- Default prompt: [scripts/prompt.txt](CopilotCodeReviewV1/scripts/prompt.txt)
-- Custom prompt template: [scripts/prompt-custom.txt](CopilotCodeReviewV1/scripts/prompt-custom.txt) uses `%CUSTOMPROMPT%` placeholder
+- Default prompt: [scripts/prompt.txt](../d356foCodeReview/scripts/prompt.txt)
+- Custom prompt template: [scripts/prompt-custom.txt](../d356foCodeReview/scripts/prompt-custom.txt) uses `%CUSTOMPROMPT%` placeholder
 - **Constraint**: Custom prompts cannot contain double quotes (`"`) - validated in index.ts
 
 ### Comment Status Convention
@@ -91,7 +91,7 @@ $uri = "$baseUrl/git/repositories/$Repository/pullrequests/$Id?api-version=7.1"
 ```
 
 ### Copilot CLI Flags
-The task runs Copilot with specific permissions in [index.ts](CopilotCodeReviewV1/index.ts):
+The task runs Copilot with specific permissions in [index.ts](../d356foCodeReview/index.ts):
 ```bash
 copilot -p "$prompt" --allow-all-paths --allow-all-tools --deny-tool 'shell(git push)'
 ```
@@ -101,7 +101,7 @@ copilot -p "$prompt" --allow-all-paths --allow-all-tools --deny-tool 'shell(git 
 
 ## Task Configuration
 
-Inputs are defined in [task.json](CopilotCodeReviewV1/task.json). Key auto-detected values:
+Inputs are defined in [task.json](../d356foCodeReview/task.json). Key auto-detected values:
 - `organization` - Extracted from `System.CollectionUri`
 - `project` - Defaults to `$(System.TeamProject)`
 - `pullRequestId` - Falls back to `$(System.PullRequest.PullRequestId)`
@@ -118,13 +118,13 @@ $env:INPUT_PROJECT = "myproject"
 $env:INPUT_REPOSITORY = "myrepo"
 $env:INPUT_PULLREQUESTID = "123"
 
-cd CopilotCodeReviewV1
+cd d356foCodeReview
 node index.js
 ```
 
 ## Testing
 
-**Current Gap**: The `CopilotCodeReviewV1/package.json` references `mocha tests/_suite.js` but no test files exist. Integration testing is currently manual via local execution or dev extension deployment.
+**Current Gap**: The `d356foCodeReview/package.json` references `mocha tests/_suite.js` but no test files exist. Integration testing is currently manual via local execution or dev extension deployment.
 
 ## Publishing to Marketplace
 
@@ -132,7 +132,7 @@ node index.js
 2. **Build and package**:
    ```powershell
    npm run build
-   npm run package:prod    # Creates LittleFortSoftware.ado-copilot-code-review-X.X.X.vsix
+    npm run package:prod    # Creates Diego Mancassola.ado-copilot-code-review-X.X.X.vsix
    ```
 3. **Upload** to [Azure DevOps Marketplace Publisher Portal](https://marketplace.visualstudio.com/manage/publishers)
 4. **Dev testing**: Use `build-dev.ps1` to create a separate dev extension (`vss-extension.dev.json`) that can be installed alongside production

@@ -27,8 +27,19 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = $PSScriptRoot
-$prodTaskDir = Join-Path $repoRoot "CopilotCodeReviewV1"
-$devTaskDir = Join-Path $repoRoot "CopilotCodeReviewDevV1"
+$prodTaskDir = Join-Path $repoRoot "d356foCodeReview"
+$devTaskDir = Join-Path $repoRoot "d356foCodeReviewDevV1"
+
+if (Test-Path $devTaskDir) {
+    $devTaskItem = Get-Item $devTaskDir
+    if (-not $devTaskItem.PSIsContainer) {
+        Remove-Item $devTaskDir -Force
+        New-Item -ItemType Directory -Path $devTaskDir -Force | Out-Null
+    }
+}
+else {
+    New-Item -ItemType Directory -Path $devTaskDir -Force | Out-Null
+}
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Building Dev Extension" -ForegroundColor Cyan
@@ -56,10 +67,22 @@ else {
 # Step 2: Copy compiled files to dev task folder
 Write-Host "`n[Step 2/4] Copying files to dev task folder..." -ForegroundColor Yellow
 
+# Copy task.json
+$taskJson = Join-Path $prodTaskDir "task.json"
+if (Test-Path $taskJson) {
+    $devTaskJson = Join-Path $devTaskDir "task.json"
+    Copy-Item $taskJson -Destination $devTaskJson -Force
+    Write-Host "  Copied: task.json" -ForegroundColor Gray
+}
+else {
+    throw "task.json not found in d356foCodeReview."
+}
+
 # Copy index.js
 $indexJs = Join-Path $prodTaskDir "index.js"
 if (Test-Path $indexJs) {
-    Copy-Item $indexJs -Destination $devTaskDir -Force
+    $devIndexJs = Join-Path $devTaskDir "index.js"
+    Copy-Item $indexJs -Destination $devIndexJs -Force
     Write-Host "  Copied: index.js" -ForegroundColor Gray
 }
 else {
@@ -88,7 +111,7 @@ if (Test-Path $nodeModulesDir) {
     Write-Host "  Copied: node_modules/" -ForegroundColor Gray
 }
 else {
-    throw "node_modules not found. Run 'npm install' in CopilotCodeReviewV1 first."
+    throw "node_modules not found. Run 'npm install' in d356foCodeReview first."
 }
 
 Write-Host "Files copied to dev task folder." -ForegroundColor Green
@@ -123,4 +146,4 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "`nNext steps:" -ForegroundColor White
 Write-Host "1. Upload the .vsix file to the Marketplace management portal" -ForegroundColor Gray
 Write-Host "2. Share the extension with your test organization" -ForegroundColor Gray
-Write-Host "3. Install and test in your pipelines using 'CopilotCodeReviewDev@0'" -ForegroundColor Gray
+Write-Host "3. Install and test in your pipelines using 'd356foCodeReview@0'" -ForegroundColor Gray
