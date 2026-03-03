@@ -3,7 +3,7 @@
     "manifestVersion": 1,
     "id": "ado-copilot-code-review",
     "name": "D356FO Copilot Code Review",
-    "version": "1.2.11",
+    "version": "1.2.13",
     "publisher": "DiegoMancassola",
     "public": true,
     "targets": [

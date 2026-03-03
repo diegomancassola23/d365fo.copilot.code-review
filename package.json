@@ -1,6 +1,6 @@
 {
     "name": "d365fo-copilot-code-review",
-    "version": "1.2.11",
+    "version": "1.2.13",
     "description": "Azure DevOps extension for code reviews using GitHub Copilot over D365FO projects",
     "scripts": {
         "bump:version": "node scripts/bump-version.js",

@@ -240,8 +240,36 @@ async function getTfvcChangedFiles(
     }
 
     const changesetId = match[1];
-    const endpoint = `${collectionUri}/${project}/_apis/tfvc/changesets/${changesetId}/changes?api-version=7.1&$top=2000`;
-    const response = await invokeAzureDevOpsApi(endpoint, token, authType);
+    const projectSegment = (project || '').trim().replace(/^\/+|\/+$/g, '');
+    const endpointCandidates = [
+        projectSegment
+            ? `${collectionUri}/${projectSegment}/_apis/tfvc/changesets/${changesetId}/changes?api-version=7.1&$top=2000`
+            : undefined,
+        `${collectionUri}/_apis/tfvc/changesets/${changesetId}/changes?api-version=7.1&$top=2000`
+    ].filter((value: string | undefined): value is string => !!value);
+
+    let response: any;
+    let lastError: unknown;
+
+    for (const endpoint of endpointCandidates) {
+        try {
+            response = await invokeAzureDevOpsApi(endpoint, token, authType);
+            break;
+        } catch (error) {
+            lastError = error;
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (!errorMessage.includes('(404)')) {
+                throw error;
+            }
+        }
+    }
+
+    if (!response) {
+        throw lastError instanceof Error
+            ? lastError
+            : new Error(`Failed to fetch TFVC changeset ${changesetId}.`);
+    }
+
     const items = Array.isArray(response?.value) ? response.value : [];
 
     return items
@@ -256,23 +284,99 @@ async function getTfvcChangedFiles(
         .filter((value: string | undefined): value is string => !!value);
 }
 
+async function getTfvcShelvesetChangedFiles(
+    collectionUri: string,
+    project: string,
+    shelveset: string,
+    token: string,
+    authType: string
+): Promise<string[]> {
+    if (!shelveset) {
+        return [];
+    }
+
+    const encodedShelveset = encodeURIComponent(shelveset);
+    const projectSegment = (project || '').trim().replace(/^\/+|\/+$/g, '');
+    const endpointCandidates = [
+        projectSegment
+            ? `${collectionUri}/${projectSegment}/_apis/tfvc/shelvesets/${encodedShelveset}/changes?api-version=7.1&$top=2000`
+            : undefined,
+        `${collectionUri}/_apis/tfvc/shelvesets/${encodedShelveset}/changes?api-version=7.1&$top=2000`
+    ].filter((value: string | undefined): value is string => !!value);
+
+    let response: any;
+    let lastError: unknown;
+
+    for (const endpoint of endpointCandidates) {
+        try {
+            response = await invokeAzureDevOpsApi(endpoint, token, authType);
+            break;
+        } catch (error) {
+            lastError = error;
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (!errorMessage.includes('(404)')) {
+                throw error;
+            }
+        }
+    }
+
+    if (!response) {
+        throw lastError instanceof Error
+            ? lastError
+            : new Error(`Failed to fetch TFVC shelveset ${shelveset}.`);
+    }
+
+    const items = Array.isArray(response?.value) ? response.value : [];
+
+    return items
+        .map((entry: any) => {
+            const itemPath = entry?.item?.path;
+            const changeType = entry?.changeType || entry?.change?.changeType || 'edit';
+            if (!itemPath) {
+                return undefined;
+            }
+            return `${itemPath} [${changeType}]`;
+        })
+        .filter((value: string | undefined): value is string => !!value);
+}
+
+function parseGitChangedFiles(stdout: string, defaultChangeType: string): string[] {
+    return (stdout || '')
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => `${line} [${defaultChangeType}]`);
+}
+
+function runGitChangedFilesCommand(workingDirectory: string, args: string[], defaultChangeType: string): string[] {
+    const result = child_process.spawnSync('git', args, {
+        cwd: workingDirectory,
+        encoding: 'utf8',
+        shell: true
+    });
+
+    if (result.status !== 0 || !result.stdout) {
+        return [];
+    }
+
+    return parseGitChangedFiles(result.stdout, defaultChangeType);
+}
+
 function getGitChangedFiles(workingDirectory: string): string[] {
     try {
-        const result = child_process.spawnSync('git', ['diff', '--name-only', 'HEAD~1', 'HEAD'], {
-            cwd: workingDirectory,
-            encoding: 'utf8',
-            shell: true
-        });
+        const strategies: Array<{ args: string[]; defaultChangeType: string }> = [
+            { args: ['diff', '--name-only', 'HEAD~1', 'HEAD'], defaultChangeType: 'modified' },
+            { args: ['show', '--name-only', '--pretty=format:', 'HEAD'], defaultChangeType: 'modified' }
+        ];
 
-        if (result.status !== 0 || !result.stdout) {
-            return [];
+        for (const strategy of strategies) {
+            const files = runGitChangedFilesCommand(workingDirectory, strategy.args, strategy.defaultChangeType);
+            if (files.length > 0) {
+                return files;
+            }
         }
 
-        return result.stdout
-            .split(/\r?\n/)
-            .map(line => line.trim())
-            .filter(Boolean)
-            .map(line => `${line} [modified]`);
+        return [];
     } catch {
         return [];
     }
@@ -293,11 +397,21 @@ async function prepareGatedReviewContext(
 
     let changedFiles: string[] = [];
 
-    if (provider.toLowerCase() === 'tfsversioncontrol' && sourceVersion) {
-        try {
-            changedFiles = await getTfvcChangedFiles(collectionUri, project, sourceVersion, token, authType);
-        } catch (error) {
-            console.log(`Warning: Failed to fetch TFVC changeset details: ${error instanceof Error ? error.message : String(error)}`);
+    if (provider.toLowerCase() === 'tfsversioncontrol') {
+        if (sourceVersion) {
+            try {
+                changedFiles = await getTfvcChangedFiles(collectionUri, project, sourceVersion, token, authType);
+            } catch (error) {
+                console.log(`Warning: Failed to fetch TFVC changeset details: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+
+        if (changedFiles.length === 0 && shelveset) {
+            try {
+                changedFiles = await getTfvcShelvesetChangedFiles(collectionUri, project, shelveset, token, authType);
+            } catch (error) {
+                console.log(`Warning: Failed to fetch TFVC shelveset details: ${error instanceof Error ? error.message : String(error)}`);
+            }
         }
     }
 
@@ -422,10 +536,10 @@ async function run(): Promise<void> {
         }
         
         // Get inputs with defaults from pipeline variables
-        let organization = tl.getInput('organization');
-        let collectionUri = tl.getInput('collectionUri');
-        let project = tl.getInput('project');
-        let repository = tl.getInput('repository');
+        const organization = normalizeInput(tl.getInput('organization'));
+        const collectionUri = normalizeInput(tl.getInput('collectionUri'));
+        const project = normalizeInput(tl.getInput('project')) || normalizeInput(tl.getVariable('System.TeamProject'));
+        const repository = normalizeInput(tl.getInput('repository')) || normalizeInput(tl.getVariable('Build.Repository.Name'));
 
         // Resolve the collection URI using priority chain:
         // 1. Explicit collectionUri input
