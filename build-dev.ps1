@@ -45,6 +45,12 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Building Dev Extension" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
+Write-Host "`n[Version] Incrementing extension/task version..." -ForegroundColor Yellow
+node (Join-Path $repoRoot "scripts\bump-version.js")
+if ($LASTEXITCODE -ne 0) {
+    throw "Version bump failed"
+}
+
 # Step 1: Build TypeScript (unless skipped)
 if (-not $SkipBuild) {
     Write-Host "`n[Step 1/4] Building TypeScript..." -ForegroundColor Yellow

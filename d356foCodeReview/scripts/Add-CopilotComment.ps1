@@ -15,7 +15,7 @@
     Optional. Status for the new thread: 'Active' or 'Closed'. Default is 'Active'.
 
 .PARAMETER FilePath
-    Optional. File path for inline comment (e.g., '/src/MyProject/Program.cs').
+    Optional. File path for inline comment (e.g., '/Metadata/Classes/MyClass.xml').
     When provided with StartLine, creates an inline comment on the specified file.
 
 .PARAMETER StartLine
@@ -29,12 +29,12 @@
     Creates a new general comment thread with closed status.
 
 .EXAMPLE
-    .\Add-CopilotComment.ps1 -Comment "Consider using async here" -Status 'Active' -FilePath '/src/Program.cs' -StartLine 42
-    Creates an inline comment on line 42 of the specified file.
+    .\Add-CopilotComment.ps1 -Comment "Validate XML metadata naming" -Status 'Active' -FilePath '/Metadata/Classes/MyClass.xml' -StartLine 42
+    Creates an inline comment on line 42 of the specified XML file.
 
 .EXAMPLE
-    .\Add-CopilotComment.ps1 -Comment "This block needs refactoring" -Status 'Active' -FilePath '/src/Program.cs' -StartLine 42 -EndLine 50
-    Creates an inline comment spanning lines 42-50 of the specified file.
+    .\Add-CopilotComment.ps1 -Comment "Review this XML metadata block" -Status 'Active' -FilePath '/Metadata/Classes/MyClass.xml' -StartLine 42 -EndLine 50
+    Creates an inline comment spanning lines 42-50 of the specified XML file.
 
 .NOTES
     Author: Little Fort Software
@@ -61,7 +61,7 @@ param(
     [ValidateSet("Active", "Closed")]
     [string]$Status = 'Active',
 
-    [Parameter(Mandatory = $false, HelpMessage = "File path for inline comment (e.g., '/src/MyProject/Program.cs')")]
+    [Parameter(Mandatory = $false, HelpMessage = "File path for inline comment (e.g., '/Metadata/Classes/MyClass.xml')")]
     [string]$FilePath,
 
     [Parameter(Mandatory = $false, HelpMessage = "Starting line number for inline comment")]

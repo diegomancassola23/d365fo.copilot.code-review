@@ -37,7 +37,7 @@
     Default is 'Active'. Only applies when creating a new thread (not replying).
 
 .PARAMETER FilePath
-    Optional. File path for inline comment (e.g., '/src/MyProject/Program.cs').
+    Optional. File path for inline comment (e.g., '/Metadata/Classes/MyClass.xml').
     When provided with StartLine, creates an inline comment on the specified file.
     Path will be normalized to use forward slashes with a leading slash.
 
@@ -64,11 +64,11 @@
     Replies to an existing thread #456 on pull request #123.
 
 .EXAMPLE
-    .\Add-AzureDevOpsPRComment.ps1 -Token "your-pat" -CollectionUri "https://dev.azure.com/myorg" -Project "myproject" -Repository "myrepo" -Id 123 -Comment "Consider async" -FilePath "/src/Program.cs" -StartLine 42
-    Creates an inline comment on line 42 of Program.cs.
+    .\Add-AzureDevOpsPRComment.ps1 -Token "your-pat" -CollectionUri "https://dev.azure.com/myorg" -Project "myproject" -Repository "myrepo" -Id 123 -Comment "Validate XML metadata naming" -FilePath "/Metadata/Classes/MyClass.xml" -StartLine 42
+    Creates an inline comment on line 42 of MyClass.xml.
 
 .EXAMPLE
-    .\Add-AzureDevOpsPRComment.ps1 -Token "your-pat" -CollectionUri "https://dev.azure.com/myorg" -Project "myproject" -Repository "myrepo" -Id 123 -Comment "Refactor this" -FilePath "/src/Program.cs" -StartLine 42 -EndLine 50 -IterationId 3
+    .\Add-AzureDevOpsPRComment.ps1 -Token "your-pat" -CollectionUri "https://dev.azure.com/myorg" -Project "myproject" -Repository "myrepo" -Id 123 -Comment "Review this XML metadata block" -FilePath "/Metadata/Classes/MyClass.xml" -StartLine 42 -EndLine 50 -IterationId 3
     Creates an inline comment spanning lines 42-50, anchored to iteration 3 of the PR.
 
 .NOTES
@@ -118,7 +118,7 @@ param(
     [ValidateSet("Active", "Fixed", "WontFix", "Closed", "Pending")]
     [string]$Status = "Active",
 
-    [Parameter(Mandatory = $false, HelpMessage = "File path for inline comment (e.g., '/src/MyProject/Program.cs')")]
+    [Parameter(Mandatory = $false, HelpMessage = "File path for inline comment (e.g., '/Metadata/Classes/MyClass.xml')")]
     [string]$FilePath,
 
     [Parameter(Mandatory = $false, HelpMessage = "Starting line number for inline comment")]
