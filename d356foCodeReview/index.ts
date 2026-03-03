@@ -79,12 +79,27 @@ function extractReviewFindings(copilotOutput: string): string {
 
 function hasBlockingFindings(copilotOutput: string): boolean {
     const normalized = copilotOutput.toLowerCase();
-    if (normalized.includes('**result: ✅ accepted**') || normalized.includes('result: accepted')) {
-        return false;
+
+    const explicitAcceptedPatterns = [
+        /\*\*result:\s*✅\s*accepted\*\*/i,
+        /result:\s*accepted/i,
+        /\*\*accepted\.?\*\*/i,
+        /\baccepted\.?\b/i
+    ];
+
+    const explicitRejectedPatterns = [
+        /\*\*result:\s*❌\s*rejected\*\*/i,
+        /result:\s*rejected/i,
+        /\*\*rejected\.?\*\*/i,
+        /\brejected\.?\b/i
+    ];
+
+    if (explicitRejectedPatterns.some(pattern => pattern.test(copilotOutput))) {
+        return true;
     }
 
-    if (normalized.includes('**result: ❌ rejected**') || normalized.includes('result: rejected')) {
-        return true;
+    if (explicitAcceptedPatterns.some(pattern => pattern.test(copilotOutput))) {
+        return false;
     }
 
     if (normalized.includes('no blocking issues found')) {
@@ -398,19 +413,22 @@ async function prepareGatedReviewContext(
     let changedFiles: string[] = [];
 
     if (provider.toLowerCase() === 'tfsversioncontrol') {
-        if (sourceVersion) {
+        if (shelveset) {
+            try {
+                changedFiles = await getTfvcShelvesetChangedFiles(collectionUri, project, shelveset, token, authType);
+                if (changedFiles.length > 0) {
+                    console.log(`Loaded TFVC changed files from shelveset: ${shelveset}`);
+                }
+            } catch (error) {
+                console.log(`Warning: Failed to fetch TFVC shelveset details: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+
+        if (changedFiles.length === 0 && sourceVersion) {
             try {
                 changedFiles = await getTfvcChangedFiles(collectionUri, project, sourceVersion, token, authType);
             } catch (error) {
                 console.log(`Warning: Failed to fetch TFVC changeset details: ${error instanceof Error ? error.message : String(error)}`);
-            }
-        }
-
-        if (changedFiles.length === 0 && shelveset) {
-            try {
-                changedFiles = await getTfvcShelvesetChangedFiles(collectionUri, project, shelveset, token, authType);
-            } catch (error) {
-                console.log(`Warning: Failed to fetch TFVC shelveset details: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
     }

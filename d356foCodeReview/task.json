@@ -10,7 +10,7 @@
     "version": {
         "Major": 1,
         "Minor": 2,
-        "Patch": 13
+        "Patch": 15
     },
     "instanceNameFormat": "D356FO Copilot Code Review",
     "minimumAgentVersion": "2.182.1",
