@@ -1,43 +1,41 @@
-# D365FO Copilot Code Review (Azure DevOps Extension)
+# D365FO Copilot Code Review for Azure DevOps Pipelines
 
-Automated pull request code reviews for Azure DevOps pipelines, powered by the official GitHub Copilot CLI.
+This extension adds an AI-assisted code review task to Azure DevOps pipelines for D365FO/X++ projects.
 
-This extension is designed for gated PR validation in D365FO/X++ repositories and can classify findings as:
+It is designed for end users who want to catch X++ best-practice and performance issues earlier, directly during gated check-in / PR validation.
 
-- `BLOCKING` (build-rejecting)
-- `WARNING` (non-blocking)
+## Why teams use it
 
-## What it does
+In many projects, code review happens late and performance or scalability issues are discovered only after code reaches shared branches.
 
-The pipeline task:
+This task shifts review left:
 
-1. Detects PR/gated context and changed files.
-2. Builds a structured prompt (including optional warning/blocking custom checks).
-3. Runs GitHub Copilot CLI on the build agent.
-4. Publishes a markdown review summary in the pipeline logs.
-5. Fails the task when blocking findings are detected.
+- analyzes changed code during pipeline validation,
+- classifies findings as warning or blocking,
+- fails the build when critical issues are detected.
 
-## Repository structure
+## How it works (high level)
 
-- `d356foCodeReview/` → production task source and scripts.
-- `d356foCodeReviewDevV1/` → packaged dev task payload.
-- `images/` → marketplace icon assets.
-- `vss-extension.json` → production extension manifest.
-- `vss-extension.dev.json` → development extension manifest.
+1. A gated check-in / PR pipeline is triggered.
+2. The pipeline runs the D365FO Copilot Code Review task.
+3. The task invokes Copilot CLI and evaluates changed X++ scope.
+4. The task returns ACCEPTED or REJECTED based on configured checks.
 
-## Prerequisites
+If blocking findings are detected, the pipeline is rejected.
 
-- Azure DevOps pipeline agent with Node.js support.
-- PowerShell 7 (`pwsh`) available on the agent.
-- GitHub PAT with Copilot access.
-- For Azure DevOps Services (cloud): either
-	- `useSystemAccessToken: true` plus mapped `SYSTEM_ACCESSTOKEN`, or
-	- an explicit Azure DevOps PAT.
-- For Azure DevOps Server (on-prem): Azure DevOps PAT is required.
+## Install the extension
 
-The task auto-checks (and attempts to install) the Copilot CLI if missing.
+Install from Azure DevOps Marketplace:
 
-## Quick start (YAML)
+- Dev listing: https://marketplace.visualstudio.com/items?itemName=DiegoMancassola.d365fo-copilot-code-review-dev
+
+Then open Azure DevOps Organization Settings > Extensions and verify installation.
+
+## Add the task to your pipeline
+
+You can configure it in Classic editor or YAML.
+
+Example YAML:
 
 ```yaml
 trigger: none
@@ -61,84 +59,68 @@ steps:
 		inputs:
 			githubPat: $(GITHUB_PAT)
 			useSystemAccessToken: true
-			timeout: '20'
+			timeout: '15'
 		env:
 			SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 ```
 
-## Key task inputs
+## Task settings (UI labels)
 
-Authentication and context:
+### Required / authentication
 
-- `githubPat` (required)
-- `azureDevOpsPat` (optional in cloud, required on-prem)
-- `useSystemAccessToken` (optional, cloud only)
-- `organization`, `collectionUri`, `project`, `repository`
+- GitHub PAT: required token used to authenticate Copilot CLI.
+- Azure DevOps PAT: optional in cloud, required on Azure DevOps Server (on-prem).
+- Use System Access Token: recommended in Azure DevOps Services (cloud) instead of ADO PAT.
 
-Runtime:
+### Context settings
 
-- `timeout`
-- `model`
-- `authors` (optional author filter)
+- Organization: Azure DevOps organization name.
+- Collection URI: full collection URL (important for on-prem).
+- Project: target project (default: $(System.TeamProject)).
+- Repository: target repository (default: $(Build.Repository.Name)).
 
-Prompt options:
+### Runtime settings
 
-- Legacy:
-	- `prompt`
-	- `promptFile`
-- Split checks:
-	- `warningPrompt` / `warningPromptFile`
-	- `blockingPrompt` / `blockingPromptFile`
-- Raw mode:
-	- `promptRaw`
-	- `promptFileRaw`
+- Timeout (minutes): max review duration (default: 15).
+- Copilot Model: optional model override.
+- Author Filter: comma-separated emails to limit execution to specific PR authors.
 
-Important: legacy prompt inputs cannot be combined with split warning/blocking inputs.
+### Prompt settings
 
-## Warning vs Blocking behavior
+- Custom Prompt File / Custom Prompt (legacy mode).
+- Warning Checks Prompt / Warning Checks Prompt File (non-blocking checks).
+- Blocking Checks Prompt / Blocking Checks Prompt File (build-blocking checks).
+- Raw Prompt / Raw Prompt File (advanced direct mode).
 
-- Any `BLOCKING` finding must produce `REJECTED` and fail the task.
-- If only `WARNING` findings exist, result is `ACCEPTED`.
-- If no findings exist, result is `ACCEPTED`.
-- If scope cannot be validated, result is `REJECTED`.
+## Prompt strategy (important)
 
-## Build and packaging
+Use one prompt mode per run:
 
-From repository root:
+- Legacy mode: Custom Prompt or Custom Prompt File
+- Split mode: Warning Checks + Blocking Checks
+- Raw mode: Raw Prompt or Raw Prompt File
 
-```bash
-npm install
-cd d356foCodeReview
-npm install
-cd ..
-```
+Do not combine legacy mode with warning/blocking mode.
 
-Production package:
+## Recommended warning vs blocking setup
 
-```bash
-npm run build
-npm run package:prod
-```
+- Warning Checks Prompt: style/maintainability findings with no runtime impact.
+- Blocking Checks Prompt: performance/reliability/security findings with real runtime impact.
 
-Development package:
+Typical policy:
 
-```powershell
-npm run package:dev
-```
+- warning only -> ACCEPTED
+- any blocking finding -> REJECTED
 
-This generates a `.vsix` extension package using the selected manifest.
+## Output behavior
 
-## Publishing notes
+The task writes a structured markdown review in pipeline logs and sets the task result accordingly:
 
-- Ensure `images/extension-icon.png` exists (minimum 128x128).
-- Keep version values aligned across:
-	- root `package.json`
-	- `d356foCodeReview/package.json`
-	- `d356foCodeReview/task.json`
-	- `vss-extension.json` and `vss-extension.dev.json`
+- ACCEPTED: no blocking violations
+- REJECTED: at least one blocking violation (or invalid review scope)
 
-The repository includes `scripts/bump-version.js` and npm scripts to automate version bump + build flow.
+## Public repository note
 
-## License
+This repository is public mainly as transparency/reference for teams and contributors who want to extend the component.
 
-GPL-3.0 (repository level).
+For day-to-day usage, focus on Marketplace installation and pipeline configuration.
