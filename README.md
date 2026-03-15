@@ -35,35 +35,6 @@ Then open Azure DevOps Organization Settings > Extensions and verify installatio
 
 You can configure it in Classic editor or YAML.
 
-Example YAML:
-
-```yaml
-trigger: none
-
-pr:
-	autoCancel: true
-	branches:
-		include:
-			- main
-
-pool:
-	vmImage: ubuntu-latest
-
-steps:
-	- checkout: self
-		fetchDepth: 0
-
-	- task: d356foCodeReview@1
-		displayName: D365FO Copilot Code Review (PR Gated)
-		condition: eq(variables['Build.Reason'], 'PullRequest')
-		inputs:
-			githubPat: $(GITHUB_PAT)
-			useSystemAccessToken: true
-			timeout: '15'
-		env:
-			SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-```
-
 ## Task settings (UI labels)
 
 ### Required / authentication
