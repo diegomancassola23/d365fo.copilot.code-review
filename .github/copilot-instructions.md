@@ -1,4 +1,4 @@
-# Copilot Instructions for ado-copilot-code-review
+# Copilot Instructions for d365fo-copilot-code-review
 
 ## Project Overview
 

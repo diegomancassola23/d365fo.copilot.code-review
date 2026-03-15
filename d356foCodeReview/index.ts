@@ -600,6 +600,10 @@ async function run(): Promise<void> {
         const model = tl.getInput('model');
         const promptFile = tl.getInput('promptFile');
         const prompt = tl.getInput('prompt');
+        const warningPrompt = tl.getInput('warningPrompt');
+        const warningPromptFile = tl.getInput('warningPromptFile');
+        const blockingPrompt = tl.getInput('blockingPrompt');
+        const blockingPromptFile = tl.getInput('blockingPromptFile');
         const promptRaw = tl.getInput('promptRaw');
         const promptFileRaw = tl.getInput('promptFileRaw');
 
@@ -653,6 +657,8 @@ async function run(): Promise<void> {
         // Determine the prompt file to use
         let promptFilePath: string = '';
         let customPromptText: string | null = null;
+        let warningPromptText = (warningPrompt || '').trim();
+        let blockingPromptText = (blockingPrompt || '').trim();
 
         // Helper to check if filePath inputs are actually set (filePath inputs return working dir when empty)
         const isPromptFileSet = promptFile &&
@@ -661,18 +667,66 @@ async function run(): Promise<void> {
         const isPromptFileRawSet = promptFileRaw &&
             fs.existsSync(promptFileRaw) &&
             fs.statSync(promptFileRaw).isFile();
+        const isWarningPromptFileSet = warningPromptFile &&
+            fs.existsSync(warningPromptFile) &&
+            fs.statSync(warningPromptFile).isFile();
+        const isBlockingPromptFileSet = blockingPromptFile &&
+            fs.existsSync(blockingPromptFile) &&
+            fs.statSync(blockingPromptFile).isFile();
 
-        // Validate that only one prompt input is provided
-        const activePromptInputs: string[] = [];
-        if (prompt) activePromptInputs.push('prompt');
-        if (isPromptFileSet) activePromptInputs.push('promptFile');
-        if (promptRaw) activePromptInputs.push('promptRaw');
-        if (isPromptFileRawSet) activePromptInputs.push('promptFileRaw');
+        if (!warningPromptText && isWarningPromptFileSet) {
+            console.log(`Using warning checks prompt from file: ${warningPromptFile}`);
+            const warningFileContent = fs.readFileSync(warningPromptFile!, 'utf8').trim();
+            if (!warningFileContent) {
+                tl.setResult(tl.TaskResult.Failed, `Warning prompt file is empty: ${warningPromptFile}`);
+                return;
+            }
+            if (warningFileContent.includes('"')) {
+                tl.setResult(tl.TaskResult.Failed, `Warning prompt cannot include double quotes ("). Please remove them from: ${warningPromptFile}`);
+                return;
+            }
+            warningPromptText = warningFileContent;
+        } else if (warningPromptText && isWarningPromptFileSet) {
+            console.log('Both warningPrompt and warningPromptFile are set. Using warningPrompt input value.');
+        }
 
-        if (activePromptInputs.length > 1) {
+        if (!blockingPromptText && isBlockingPromptFileSet) {
+            console.log(`Using blocking checks prompt from file: ${blockingPromptFile}`);
+            const blockingFileContent = fs.readFileSync(blockingPromptFile!, 'utf8').trim();
+            if (!blockingFileContent) {
+                tl.setResult(tl.TaskResult.Failed, `Blocking prompt file is empty: ${blockingPromptFile}`);
+                return;
+            }
+            if (blockingFileContent.includes('"')) {
+                tl.setResult(tl.TaskResult.Failed, `Blocking prompt cannot include double quotes ("). Please remove them from: ${blockingPromptFile}`);
+                return;
+            }
+            blockingPromptText = blockingFileContent;
+        } else if (blockingPromptText && isBlockingPromptFileSet) {
+            console.log('Both blockingPrompt and blockingPromptFile are set. Using blockingPrompt input value.');
+        }
+
+        const hasRawPromptInput = !!promptRaw || !!isPromptFileRawSet;
+        const hasLegacyCustomPrompt = !!prompt || !!isPromptFileSet;
+        const hasSplitCustomPrompt = !!warningPromptText || !!blockingPromptText;
+
+        if (promptRaw && isPromptFileRawSet) {
             tl.setResult(tl.TaskResult.Failed,
-                `Multiple prompt inputs are set (${activePromptInputs.join(', ')}). Only one prompt input should be provided. ` +
-                'Please use only one of: prompt, promptFile, promptRaw, or promptFileRaw.');
+                'Both promptRaw and promptFileRaw are set. Please use only one raw prompt input.');
+            return;
+        }
+
+        if (hasRawPromptInput && (hasLegacyCustomPrompt || hasSplitCustomPrompt)) {
+            tl.setResult(tl.TaskResult.Failed,
+                'Raw prompt inputs (promptRaw/promptFileRaw) cannot be combined with custom prompt inputs. ' +
+                'Use either raw prompt mode or template-based custom prompt mode.');
+            return;
+        }
+
+        if (hasLegacyCustomPrompt && hasSplitCustomPrompt) {
+            tl.setResult(tl.TaskResult.Failed,
+                'Legacy custom prompt inputs (prompt/promptFile) cannot be combined with warningPrompt/blockingPrompt. ' +
+                'Use only one custom prompt mode.');
             return;
         }
 
@@ -716,17 +770,20 @@ async function run(): Promise<void> {
             customPromptText = fileContent;
         }
 
-        if (customPromptText) {
+        if (customPromptText || hasSplitCustomPrompt) {
             // Use custom prompt template with placeholder replacement
             const customPromptTemplate = path.join(scriptsDir, 'prompt-custom.txt');
             const templateContent = fs.readFileSync(customPromptTemplate, 'utf8');
-            const mergedPrompt = templateContent.replace('%CUSTOMPROMPT%', customPromptText);
+            const mergedPrompt = templateContent
+                .replace('%CUSTOMPROMPT%', customPromptText || 'No additional generic instructions provided.')
+                .replace('%WARNING_PROMPT%', warningPromptText || 'No additional warning-only checks provided.')
+                .replace('%BLOCKING_PROMPT%', blockingPromptText || 'No additional blocking checks provided.');
             console.log('\nCUSTOM PROMPT:\n' + mergedPrompt + '\n\n');
 
             // Write merged prompt to a temp file in the working directory
             promptFilePath = path.join(workingDirectory, '_copilot_prompt.txt');
             fs.writeFileSync(promptFilePath, mergedPrompt, 'utf8');
-            console.log('Custom prompt merged with instruction template.');
+            console.log('Custom prompt instructions merged with template.');
         } else if (!promptRaw && !isPromptFileRawSet) {
             const gatedPrompt = [
                 'You are reviewing a VSTS/Azure DevOps gated check-in run that has no Pull Request context.',
@@ -875,8 +932,7 @@ async function installCopilotCli(): Promise<void> {
 
 async function runCopilotCli(promptFilePath: string, model: string | undefined, workingDirectory: string, timeoutMs: number): Promise<string> {
     return new Promise((resolve, reject) => {
-        // Build PowerShell command that reads prompt file and passes content to copilot CLI
-        // This mirrors the original implementation: $prompt = Get-Content -Path "prompt.txt" -Raw; copilot -p $prompt ...
+        // Build PowerShell command that reads the generated prompt file and passes content to Copilot CLI.
         let copilotCmd = `copilot -p "$prompt" --allow-all-paths --allow-all-tools --deny-tool 'shell(git push)'`;
         if (model) {
             copilotCmd += ` --model ${model}`;

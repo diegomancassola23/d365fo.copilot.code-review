@@ -1,37 +1,50 @@
-For this task, you will take on the role of a senior engineer performing a code review. The details of a pull request for the repo in the working directory have been saved to the PR_Details.txt file—please review this file for broad context on the pull request. Additionally, details on the specific commits and files associated with the pull request's most recent iteration have been saved to the Iteration_Details.txt file. This information along with git commands and the local copy of the repository will provide the detail you need to perform the pull request. Review only changed X++ XML (`.xml`) files and ignore all other file types.
+For this task, you will take on the role of a senior engineer performing a code review for a VSTS/Azure DevOps gated check-in run.
 
-The PR_Details.txt file may contain a JSON section titled "COPILOT COMMENT THREADS (JSON)" listing comment threads from previous Copilot reviews. Each thread includes a `status` field (e.g., "active", "fixed", "closed"), the full comment text in `content`, and a `replies` array containing any threaded replies with their author, content, and publishedDate. For each thread with an "active" status, evaluate whether the underlying issue has been addressed in the current iteration's changes—consider both the code diff and any reply context. If the issue has been resolved, mark the thread as fixed by running:
+This workflow is VSTS-only.
 
-.\Update-CopilotComment.ps1 -ThreadId <id> -Status Fixed
+The task generates two runtime context files in the working directory:
+- PR_Details.txt (general gated-build context)
+- Iteration_Details.txt (review scope)
+Read both files first.
 
-Only resolve threads where you can confirm the issue was genuinely addressed. Do not resolve threads for issues that remain unfixed. Skip threads that are already in a resolved state (e.g., "fixed", "closed", "wontFix"). If the JSON section is absent or empty, skip this step.
+Scope rules (strict):
+- Review ONLY files listed under "GATED CHANGED FILES" in Iteration_Details.txt.
+- Review ONLY changed X++ XML files (`.xml`) and program functions directly impacted by those XML changes.
+- Ignore all non-XML file types.
+- Do not inspect, infer, or comment on files not explicitly listed in Iteration_Details.txt.
+- If no in-scope files are present or readable, set result to REJECTED and explain that scope could not be validated.
 
-If you determine that you need to leave a new PR comment, perform the following two steps:
+Review objective:
+- Evaluate code quality primarily against Microsoft X++ coding standards and best practices:
+	https://learn.microsoft.com/en-us/previous-versions/dynamicsax-2012/developer/x-coding-standards
+- Prioritize findings related to: performance, security, reusability, simplification, and adherence to Microsoft best practices.
+- Raise maintainability/consistency issues only when there is clear and meaningful deviation.
+- Exclude style-only or preference-only comments with low impact.
+- When possible, include concise corrective guidance and a minimal example snippet.
 
-1. Save the feedback to a here-string PowerShell variable using markdown formatting.
+Execution constraints:
+- This is a gated build mode: do not generate or call PR comment scripts.
+- Do not use assumptions outside the gated-build context files.
+- If environment/network restrictions block deeper checks, continue with available local evidence and state assumptions clearly.
 
-2. After saving the comment variable, run the Add-CopilotComment.ps1 script and pass in the comment as a parameter. You should also explicitly pass a `-Status` parameter indicating whether the comment should create an open thread (`Active`) or a resolved thread (`Closed`).
-
-For file-specific feedback, use inline comments by providing the `-FilePath` and `-StartLine` parameters. You may also provide `-EndLine` for multi-line comments (defaults to `-StartLine` if omitted). Line numbers should reference the current (changed) version of the file, not the original. Example:
-
-.\scripts\Add-CopilotComment.ps1 -Comment $comment -Status 'Active' -FilePath '/Metadata/Classes/MyClass.xml' -StartLine 42 -EndLine 45
-
-For general PR-level feedback that is not specific to a file or line, omit the file parameters:
-
-.\scripts\Add-CopilotComment.ps1 -Comment $comment -Status 'Closed'
-
-Notes:
-- Use the status value 'Closed' for all positive feedback or when the PR requires no further action (i.e. approved, no issues found).
-- Use the status value 'Active' for any feedback that requests changes or further work.
-- Prefer inline comments (`-FilePath` and `-StartLine`) when the feedback relates to specific code locations.
-- The file path should use forward slashes and start with a leading slash (e.g., '/Metadata/Classes/MyClass.xml').
-- When including multi-line code blocks in the comment markdown, always ensure the code block is preceded and followed by lines with triple backticks (i.e. '```')
-
-Be aware that you are operating in an Azure Pipelines context and so permissions restrictions over network or file access may occur. If you encounter conditions blocking you from performing the outlined steps, you do not need to persist indefinitely—you may simply print any suggestions to the console log and end the run.
-
-The rest of this prompt is provided by the DevOps admin overseeing this pull request and should provide more direction for how it should be performed:
+Additional instructions from the DevOps admin:
 
 %CUSTOMPROMPT%
+
+Warning checks (non-blocking):
+
+%WARNING_PROMPT%
+
+Blocking checks (build-blocking):
+
+%BLOCKING_PROMPT%
+
+Severity rules:
+- Classify every finding explicitly as BLOCKING or WARNING.
+- A BLOCKING finding must lead to `REJECTED`.
+- If there are only WARNING findings (and no BLOCKING findings), the result must be `ACCEPTED`.
+- If no issues are found, the result must be `ACCEPTED`.
+- If scope cannot be validated, the result must be `REJECTED`.
 
 Final output requirements (strict):
 - Return only one markdown block starting with this exact heading: `## Code Review — Findings`

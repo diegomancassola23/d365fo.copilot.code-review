@@ -10,7 +10,7 @@
     "version": {
         "Major": 1,
         "Minor": 2,
-        "Patch": 15
+        "Patch": 18
     },
     "instanceNameFormat": "D356FO Copilot Code Review",
     "minimumAgentVersion": "2.182.1",
@@ -104,6 +104,46 @@
                 "rows": "10",
                 "maxLength": "5000"
             }
+        },
+        {
+            "name": "warningPrompt",
+            "type": "multiLine",
+            "label": "Warning Checks Prompt",
+            "required": false,
+            "defaultValue": "",
+            "helpMarkDown": "Optional. Additional review checks to treat as warnings only (non-blocking). Cannot be combined with promptRaw/promptFileRaw or legacy Custom Prompt inputs.",
+            "properties": {
+                "rows": "8",
+                "maxLength": "5000"
+            }
+        },
+        {
+            "name": "warningPromptFile",
+            "type": "filePath",
+            "label": "Warning Checks Prompt File",
+            "required": false,
+            "defaultValue": "",
+            "helpMarkDown": "Optional. Path to a .txt file containing warning-only checks. If both warningPrompt and warningPromptFile are set, warningPrompt takes precedence."
+        },
+        {
+            "name": "blockingPrompt",
+            "type": "multiLine",
+            "label": "Blocking Checks Prompt",
+            "required": false,
+            "defaultValue": "",
+            "helpMarkDown": "Optional. Additional review checks to treat as blocking. Violations should produce REJECTED result. Cannot be combined with promptRaw/promptFileRaw or legacy Custom Prompt inputs.",
+            "properties": {
+                "rows": "8",
+                "maxLength": "5000"
+            }
+        },
+        {
+            "name": "blockingPromptFile",
+            "type": "filePath",
+            "label": "Blocking Checks Prompt File",
+            "required": false,
+            "defaultValue": "",
+            "helpMarkDown": "Optional. Path to a .txt file containing blocking checks. If both blockingPrompt and blockingPromptFile are set, blockingPrompt takes precedence."
         },
         {
             "name": "promptRaw",

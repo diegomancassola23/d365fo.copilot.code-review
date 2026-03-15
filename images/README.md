@@ -1,28 +1,29 @@
-# Extension Icon
+# Marketplace Icon Assets
 
-The Azure DevOps marketplace requires a PNG icon (minimum 128x128 pixels).
+This folder contains branding assets for the Azure DevOps extension marketplace listing.
 
-## Current Status
+## Required file
 
-A placeholder SVG (`extension-icon.svg`) has been created. Before publishing to the marketplace, you need to:
+- `extension-icon.png`
 
-1. Either convert the SVG to PNG:
-   - Use any image editor or online converter
-   - Export as 128x128 PNG (minimum) or larger
-   - Save as `extension-icon.png`
+Azure DevOps requires a PNG icon with a minimum size of `128x128`.
 
-2. Or replace with your own custom icon:
-   - Create a PNG image (minimum 128x128 pixels)
-   - Save as `extension-icon.png` in this folder
+## Recommended size
 
-## Recommended Icon Sizes
+- `256x256` PNG for better quality on high-DPI displays.
 
-- Minimum: 128x128 pixels
-- Recommended: 256x256 pixels for better quality on high-DPI displays
+## Publishing checklist
 
-## Icon Guidelines
+Before packaging/publishing:
 
-- Use simple, recognizable imagery
-- Ensure good contrast for visibility
-- Consider how it looks at small sizes
-- Follow Azure DevOps marketplace branding guidelines
+1. Confirm `extension-icon.png` exists in this folder.
+2. Verify the icon path in manifests:
+   - `vss-extension.json`
+   - `vss-extension.dev.json`
+3. Ensure the image remains clear at small sizes.
+
+## Design tips
+
+- Keep shapes simple and recognizable.
+- Use strong contrast for readability.
+- Avoid tiny text inside the icon.
