@@ -140,6 +140,361 @@ function getReviewReferences(): string[] {
     return refs;
 }
 
+function parseTfvcChangesetId(value: string | undefined): string | undefined {
+    const normalized = normalizeInput(value);
+    if (!normalized) {
+        return undefined;
+    }
+
+    const exactMatch = normalized.match(/^C?(\d+)$/i);
+    if (exactMatch?.[1]) {
+        return exactMatch[1];
+    }
+
+    const prefixedMatch = normalized.match(/\bC(\d+)\b/i);
+    if (prefixedMatch?.[1]) {
+        return prefixedMatch[1];
+    }
+
+    const changesetWordMatch = normalized.match(/\bchangeset\s*#?\s*(\d+)\b/i);
+    if (changesetWordMatch?.[1]) {
+        return changesetWordMatch[1];
+    }
+
+    return undefined;
+}
+
+function resolveTfvcChangesetId(): string | undefined {
+    const candidates = [
+        normalizeInput(tl.getVariable('Build.SourceVersion')),
+        normalizeInput(tl.getVariable('Build.SourceVersionMessage')),
+        normalizeInput(tl.getVariable('Build.SourceTfvcShelveset'))
+    ];
+
+    for (const candidate of candidates) {
+        const parsed = parseTfvcChangesetId(candidate);
+        if (parsed) {
+            return parsed;
+        }
+    }
+
+    return undefined;
+}
+
+function resolveTfvcShelveset(): string | undefined {
+    return normalizeInput(tl.getVariable('Build.SourceTfvcShelveset'));
+}
+
+function unwrapShelvesetResponse(response: any): any {
+    if (!response) {
+        return undefined;
+    }
+
+    if (Array.isArray(response?.value) && response.value.length > 0) {
+        return response.value[0];
+    }
+
+    return response;
+}
+
+function truncateForTitle(value: string, maxLength: number = 200): string {
+    const sanitized = value
+        .replace(/\*{3}NO_CI\*{3}/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (sanitized.length <= maxLength) {
+        return sanitized;
+    }
+
+    return `${sanitized.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
+}
+
+async function invokeAzureDevOpsApiWithFallback(
+    endpointCandidates: string[],
+    token: string,
+    authType: string,
+    notFoundMessage: string
+): Promise<any> {
+    let response: any;
+    let lastError: unknown;
+
+    for (const endpoint of endpointCandidates) {
+        try {
+            response = await invokeAzureDevOpsApi(endpoint, token, authType);
+            break;
+        } catch (error) {
+            lastError = error;
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (!errorMessage.includes('(404)')) {
+                throw error;
+            }
+        }
+    }
+
+    if (!response) {
+        throw lastError instanceof Error
+            ? lastError
+            : new Error(notFoundMessage);
+    }
+
+    return response;
+}
+
+async function getTfvcChangesetDetails(
+    collectionUri: string,
+    project: string,
+    changesetId: string,
+    token: string,
+    authType: string
+): Promise<any> {
+    const projectSegment = (project || '').trim().replace(/^\/+|\/+$/g, '');
+    const endpointCandidates = [
+        projectSegment
+            ? `${collectionUri}/${projectSegment}/_apis/tfvc/changesets/${changesetId}?api-version=7.1`
+            : undefined,
+        `${collectionUri}/_apis/tfvc/changesets/${changesetId}?api-version=7.1`
+    ].filter((value: string | undefined): value is string => !!value);
+
+    return invokeAzureDevOpsApiWithFallback(
+        endpointCandidates,
+        token,
+        authType,
+        `Failed to fetch TFVC changeset ${changesetId}.`
+    );
+}
+
+async function getTfvcChangesetLinkedWorkItemIds(
+    collectionUri: string,
+    project: string,
+    changesetId: string,
+    token: string,
+    authType: string
+): Promise<number[]> {
+    const projectSegment = (project || '').trim().replace(/^\/+|\/+$/g, '');
+    const endpointCandidates = [
+        projectSegment
+            ? `${collectionUri}/${projectSegment}/_apis/tfvc/changesets/${changesetId}/workItems?api-version=7.1`
+            : undefined,
+        `${collectionUri}/_apis/tfvc/changesets/${changesetId}/workItems?api-version=7.1`
+    ].filter((value: string | undefined): value is string => !!value);
+
+    const response = await invokeAzureDevOpsApiWithFallback(
+        endpointCandidates,
+        token,
+        authType,
+        `Failed to fetch linked work items for TFVC changeset ${changesetId}.`
+    );
+
+    const workItems = Array.isArray(response?.value) ? response.value : [];
+    return workItems
+        .map((item: any) => Number(item?.id))
+        .filter((id: number) => Number.isFinite(id));
+}
+
+async function getTfvcShelvesetDetails(
+    collectionUri: string,
+    project: string,
+    shelveset: string,
+    token: string,
+    authType: string
+): Promise<any> {
+    const encodedShelveset = encodeURIComponent(shelveset);
+    const projectSegment = (project || '').trim().replace(/^\/+|\/+$/g, '');
+    const endpointCandidates = [
+        projectSegment
+            ? `${collectionUri}/${projectSegment}/_apis/tfvc/shelvesets/${encodedShelveset}?api-version=7.1`
+            : undefined,
+        `${collectionUri}/_apis/tfvc/shelvesets/${encodedShelveset}?api-version=7.1`
+    ].filter((value: string | undefined): value is string => !!value);
+
+    const response = await invokeAzureDevOpsApiWithFallback(
+        endpointCandidates,
+        token,
+        authType,
+        `Failed to fetch TFVC shelveset ${shelveset}.`
+    );
+
+    return unwrapShelvesetResponse(response);
+}
+
+async function getTfvcShelvesetLinkedWorkItemIds(
+    collectionUri: string,
+    project: string,
+    shelveset: string,
+    token: string,
+    authType: string
+): Promise<number[]> {
+    const encodedShelveset = encodeURIComponent(shelveset);
+    const projectSegment = (project || '').trim().replace(/^\/+|\/+$/g, '');
+    const endpointCandidates = [
+        projectSegment
+            ? `${collectionUri}/${projectSegment}/_apis/tfvc/shelvesets/${encodedShelveset}/workItems?api-version=7.1`
+            : undefined,
+        `${collectionUri}/_apis/tfvc/shelvesets/${encodedShelveset}/workItems?api-version=7.1`,
+        projectSegment
+            ? `${collectionUri}/${projectSegment}/_apis/tfvc/shelvesets/${encodedShelveset}/workitems?api-version=7.1`
+            : undefined,
+        `${collectionUri}/_apis/tfvc/shelvesets/${encodedShelveset}/workitems?api-version=7.1`
+    ].filter((value: string | undefined): value is string => !!value);
+
+    const response = await invokeAzureDevOpsApiWithFallback(
+        endpointCandidates,
+        token,
+        authType,
+        `Failed to fetch linked work items for TFVC shelveset ${shelveset}.`
+    );
+
+    const workItems = Array.isArray(response?.value) ? response.value : [];
+    return workItems
+        .map((item: any) => Number(item?.id))
+        .filter((id: number) => Number.isFinite(id));
+}
+
+async function isTaskWorkItem(
+    collectionUri: string,
+    project: string,
+    workItemId: number,
+    token: string,
+    authType: string
+): Promise<boolean> {
+    const projectSegment = (project || '').trim().replace(/^\/+|\/+$/g, '');
+    const endpointCandidates = [
+        projectSegment
+            ? `${collectionUri}/${projectSegment}/_apis/wit/workitems/${workItemId}?fields=System.WorkItemType&api-version=7.1`
+            : undefined,
+        `${collectionUri}/_apis/wit/workitems/${workItemId}?fields=System.WorkItemType&api-version=7.1`
+    ].filter((value: string | undefined): value is string => !!value);
+
+    const response = await invokeAzureDevOpsApiWithFallback(
+        endpointCandidates,
+        token,
+        authType,
+        `Failed to fetch work item ${workItemId}.`
+    );
+
+    const workItemType = String(response?.fields?.['System.WorkItemType'] || '').trim().toLowerCase();
+    const rawWorkItemType = response?.fields?.['System.WorkItemType'] || '(empty)';
+    tl.warning(`[ParentResolution] Work item ${workItemId} type raw: "${rawWorkItemType}" -> normalized: "${workItemType}"`);
+    return workItemType === 'task' || workItemType.includes('attivit');
+}
+
+async function resolveParentTaskIdFromChangeset(
+    collectionUri: string,
+    project: string,
+    changesetId: string,
+    token: string,
+    authType: string
+): Promise<number | undefined> {
+    tl.warning(`[ParentResolution] Querying work items linked to changeset ${changesetId}...`);
+    const linkedWorkItemIds = await getTfvcChangesetLinkedWorkItemIds(
+        collectionUri,
+        project,
+        changesetId,
+        token,
+        authType
+    );
+
+    tl.warning(`[ParentResolution] Changeset ${changesetId} has ${linkedWorkItemIds.length} linked work item(s): [${linkedWorkItemIds.join(', ')}]`);
+
+    for (const workItemId of linkedWorkItemIds) {
+        try {
+            const isTask = await isTaskWorkItem(collectionUri, project, workItemId, token, authType);
+            tl.warning(`[ParentResolution] Work item ${workItemId} -> isTask: ${isTask}`);
+            if (isTask) {
+                return workItemId;
+            }
+        } catch (error) {
+            console.log(`Warning: Failed to inspect linked work item ${workItemId}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    tl.warning(`[ParentResolution] No Task work item found in changeset ${changesetId}.`);
+    return undefined;
+}
+
+async function resolveParentTaskIdFromShelveset(
+    collectionUri: string,
+    project: string,
+    shelveset: string,
+    token: string,
+    authType: string
+): Promise<number | undefined> {
+    tl.warning(`[ParentResolution] Querying work items linked to shelveset: ${shelveset}...`);
+    const linkedWorkItemIds = await getTfvcShelvesetLinkedWorkItemIds(
+        collectionUri,
+        project,
+        shelveset,
+        token,
+        authType
+    );
+
+    tl.warning(`[ParentResolution] Shelveset has ${linkedWorkItemIds.length} linked work item(s): [${linkedWorkItemIds.join(', ')}]`);
+
+    for (const workItemId of linkedWorkItemIds) {
+        try {
+            const isTask = await isTaskWorkItem(collectionUri, project, workItemId, token, authType);
+            tl.warning(`[ParentResolution] Shelveset work item ${workItemId} -> isTask: ${isTask}`);
+            if (isTask) {
+                return workItemId;
+            }
+        } catch (error) {
+            console.log(`Warning: Failed to inspect shelveset-linked work item ${workItemId}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    tl.warning(`[ParentResolution] No Task work item found in shelveset.`);
+    return undefined;
+}
+
+function resolveChangesetAuthor(changeset: any): string | undefined {
+    const candidates = [
+        typeof changeset?.author === 'string' ? changeset.author : undefined,
+        changeset?.author?.uniqueName,
+        changeset?.author?.mailAddress,
+        changeset?.author?.displayName,
+        typeof changeset?.checkedInBy === 'string' ? changeset.checkedInBy : undefined,
+        changeset?.checkedInBy?.uniqueName,
+        changeset?.checkedInBy?.mailAddress,
+        changeset?.checkedInBy?.displayName,
+        normalizeInput(tl.getVariable('Build.RequestedForEmail')),
+        normalizeInput(tl.getVariable('Build.RequestedFor'))
+    ];
+
+    for (const candidate of candidates) {
+        const normalized = normalizeInput(typeof candidate === 'string' ? candidate : undefined);
+        if (normalized) {
+            return normalized;
+        }
+    }
+
+    return undefined;
+}
+
+function resolveShelvesetAuthor(shelveset: any): string | undefined {
+    const candidates = [
+        typeof shelveset?.owner === 'string' ? shelveset.owner : undefined,
+        shelveset?.owner?.uniqueName,
+        shelveset?.owner?.mailAddress,
+        shelveset?.owner?.displayName,
+        shelveset?.ownerName,
+        shelveset?.ownerDisplayName,
+        shelveset?.createdBy?.uniqueName,
+        shelveset?.createdBy?.mailAddress,
+        shelveset?.createdBy?.displayName,
+        normalizeInput(tl.getVariable('Build.RequestedForEmail')),
+        normalizeInput(tl.getVariable('Build.RequestedFor'))
+    ];
+
+    for (const candidate of candidates) {
+        const normalized = normalizeInput(typeof candidate === 'string' ? candidate : undefined);
+        if (normalized) {
+            return normalized;
+        }
+    }
+
+    return undefined;
+}
+
 async function createFailureWorkItem(
     collectionUri: string,
     project: string,
@@ -147,10 +502,76 @@ async function createFailureWorkItem(
     authType: string,
     copilotOutput: string
 ): Promise<{ id: number; url: string }> {
+    const sourceVersion = normalizeInput(tl.getVariable('Build.SourceVersion'));
+    const sourceVersionMessage = normalizeInput(tl.getVariable('Build.SourceVersionMessage'));
+    const changesetId = resolveTfvcChangesetId();
+    const shelveset = resolveTfvcShelveset();
+
+    let changeset: any;
+    let shelvesetDetails: any;
+    let parentTaskId: number | undefined;
+
+    tl.warning(`[WorkItemContext] Init -> ChangesetId: ${changesetId || 'none'}; Shelveset: ${shelveset || 'none'}; SourceVersion: ${sourceVersion || 'none'}`);
+
+    if (changesetId) {
+        try {
+            changeset = await getTfvcChangesetDetails(collectionUri, project, changesetId, token, authType);
+        } catch (error) {
+            console.log(`Warning: Failed to fetch changeset metadata for ${changesetId}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+        try {
+            parentTaskId = await resolveParentTaskIdFromChangeset(collectionUri, project, changesetId, token, authType);
+        } catch (error) {
+            console.log(`Warning: Failed to resolve parent task from changeset ${changesetId}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    if (shelveset) {
+        try {
+            shelvesetDetails = await getTfvcShelvesetDetails(collectionUri, project, shelveset, token, authType);
+        } catch (error) {
+            console.log(`Warning: Failed to fetch shelveset metadata for ${shelveset}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+        if (!parentTaskId) {
+            try {
+                parentTaskId = await resolveParentTaskIdFromShelveset(collectionUri, project, shelveset, token, authType);
+            } catch (error) {
+                console.log(`Warning: Failed to resolve parent task from shelveset ${shelveset}: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+    }
+
     return new Promise((resolve, reject) => {
         const references = getReviewReferences();
-        const sourceVersion = normalizeInput(tl.getVariable('Build.SourceVersion')) || 'unknown';
-        const title = `Code review failed - ${project} - ${sourceVersion}`;
+        const sourceVersionForTitle = sourceVersion || 'unknown';
+        const checkinComment =
+            normalizeInput(changeset?.comment) ||
+            normalizeInput(shelvesetDetails?.comment) ||
+            sourceVersionMessage;
+        const title = truncateForTitle(`Code Review - ${checkinComment || sourceVersionForTitle}`);
+        const assignedTo = resolveChangesetAuthor(changeset) || resolveShelvesetAuthor(shelvesetDetails);
+
+        tl.warning(`[WorkItemContext] SourceVersion: ${sourceVersionForTitle}; ChangesetId: ${changesetId || 'not resolved'}; Shelveset: ${shelveset || 'not resolved'}`);
+        tl.warning(`[WorkItemContext] AssignedTo: ${assignedTo || 'not resolved'}; ParentTaskId: ${parentTaskId || 'not resolved'}; Title: ${title}`);
+
+        if (assignedTo) {
+            references.push(`AssignedTo: ${assignedTo}`);
+        }
+        if (changesetId) {
+            references.push(`ChangesetId: ${changesetId}`);
+        }
+        if (checkinComment) {
+            references.push(`CheckinComment: ${checkinComment}`);
+        }
+        if (shelveset) {
+            references.push(`Shelveset: ${shelveset}`);
+        }
+        if (parentTaskId) {
+            references.push(`ParentTaskId: ${parentTaskId}`);
+        }
+
         const detailsHtml = [
             '<h3>Code review findings (blocking)</h3>',
             '<p>The gated code review found blocking issues.</p>',
@@ -160,10 +581,34 @@ async function createFailureWorkItem(
             `<pre>${escapeHtml(copilotOutput.trim() || 'No output generated by Copilot.')}</pre>`
         ].join('');
 
-        const patchBody = JSON.stringify([
+        const patchOperations: Array<{ op: string; path: string; value: any }> = [
             { op: 'add', path: '/fields/System.Title', value: title },
             { op: 'add', path: '/fields/System.Description', value: detailsHtml }
-        ]);
+        ];
+
+        if (assignedTo) {
+            patchOperations.push({
+                op: 'add',
+                path: '/fields/System.AssignedTo',
+                value: assignedTo
+            });
+        }
+
+        if (parentTaskId) {
+            patchOperations.push({
+                op: 'add',
+                path: '/relations/-',
+                value: {
+                    rel: 'System.LinkTypes.Hierarchy-Reverse',
+                    url: `${collectionUri}/_apis/wit/workItems/${parentTaskId}`,
+                    attributes: {
+                        comment: 'Parent task linked from associated TFVC changeset work item.'
+                    }
+                }
+            });
+        }
+
+        const patchBody = JSON.stringify(patchOperations);
 
         const headers: Record<string, string> = {
             'Content-Type': 'application/json-patch+json',
@@ -249,12 +694,11 @@ async function getTfvcChangedFiles(
     token: string,
     authType: string
 ): Promise<string[]> {
-    const match = sourceVersion.match(/^C?(\d+)$/i);
-    if (!match?.[1]) {
+    const changesetId = parseTfvcChangesetId(sourceVersion);
+    if (!changesetId) {
         return [];
     }
 
-    const changesetId = match[1];
     const projectSegment = (project || '').trim().replace(/^\/+|\/+$/g, '');
     const endpointCandidates = [
         projectSegment
@@ -263,27 +707,12 @@ async function getTfvcChangedFiles(
         `${collectionUri}/_apis/tfvc/changesets/${changesetId}/changes?api-version=7.1&$top=2000`
     ].filter((value: string | undefined): value is string => !!value);
 
-    let response: any;
-    let lastError: unknown;
-
-    for (const endpoint of endpointCandidates) {
-        try {
-            response = await invokeAzureDevOpsApi(endpoint, token, authType);
-            break;
-        } catch (error) {
-            lastError = error;
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            if (!errorMessage.includes('(404)')) {
-                throw error;
-            }
-        }
-    }
-
-    if (!response) {
-        throw lastError instanceof Error
-            ? lastError
-            : new Error(`Failed to fetch TFVC changeset ${changesetId}.`);
-    }
+    const response = await invokeAzureDevOpsApiWithFallback(
+        endpointCandidates,
+        token,
+        authType,
+        `Failed to fetch TFVC changeset ${changesetId}.`
+    );
 
     const items = Array.isArray(response?.value) ? response.value : [];
 
@@ -319,27 +748,12 @@ async function getTfvcShelvesetChangedFiles(
         `${collectionUri}/_apis/tfvc/shelvesets/${encodedShelveset}/changes?api-version=7.1&$top=2000`
     ].filter((value: string | undefined): value is string => !!value);
 
-    let response: any;
-    let lastError: unknown;
-
-    for (const endpoint of endpointCandidates) {
-        try {
-            response = await invokeAzureDevOpsApi(endpoint, token, authType);
-            break;
-        } catch (error) {
-            lastError = error;
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            if (!errorMessage.includes('(404)')) {
-                throw error;
-            }
-        }
-    }
-
-    if (!response) {
-        throw lastError instanceof Error
-            ? lastError
-            : new Error(`Failed to fetch TFVC shelveset ${shelveset}.`);
-    }
+    const response = await invokeAzureDevOpsApiWithFallback(
+        endpointCandidates,
+        token,
+        authType,
+        `Failed to fetch TFVC shelveset ${shelveset}.`
+    );
 
     const items = Array.isArray(response?.value) ? response.value : [];
 
@@ -597,6 +1011,7 @@ async function run(): Promise<void> {
 
         // Get optional inputs
         const timeoutMinutes = parseInt(tl.getInput('timeout') || '15', 10);
+        const failOnBlockingFindings = tl.getBoolInput('failOnBlockingFindings', false);
         const model = tl.getInput('model');
         const promptFile = tl.getInput('promptFile');
         const prompt = tl.getInput('prompt');
@@ -615,6 +1030,7 @@ async function run(): Promise<void> {
         console.log(`Repository: ${repository}`);
         console.log('Mode: VSTS Gated Review (no Pull Request dependency)');
         console.log(`Timeout: ${timeoutMinutes} minutes`);
+        console.log(`Fail on blocking findings: ${failOnBlockingFindings ? 'enabled' : 'disabled (report-only mode)'}`);
         if (model) {
             console.log(`Model: ${model}`);
         }
@@ -828,6 +1244,38 @@ async function run(): Promise<void> {
         tl.uploadSummary(reviewReportPath);
 
         if (hasBlockingFindings(normalizedReviewOutput)) {
+            if (!failOnBlockingFindings) {
+                try {
+                    const workItem = await createFailureWorkItem(
+                        resolvedCollectionUri,
+                        project,
+                        azureDevOpsToken,
+                        azureDevOpsAuthType,
+                        normalizedReviewOutput
+                    );
+
+                    const reportOnlyMessage = workItem?.id
+                        ? `Blocking findings detected (report-only mode). Work item created: ${workItem.id}`
+                        : 'Blocking findings detected (report-only mode). Work item created.';
+
+                    console.log(reportOnlyMessage);
+                    if (workItem?.url) {
+                        console.log(`Work item URL: ${workItem.url}`);
+                    }
+
+                    tl.setResult(tl.TaskResult.Succeeded, reportOnlyMessage);
+                    return;
+                } catch (workItemError) {
+                    const createError = workItemError instanceof Error ? workItemError.message : String(workItemError);
+                    const reportOnlyMessage =
+                        'Blocking findings detected (report-only mode), but failed to create Azure DevOps Task work item: ' +
+                        createError;
+                    tl.warning(reportOnlyMessage);
+                    tl.setResult(tl.TaskResult.Succeeded, reportOnlyMessage);
+                    return;
+                }
+            }
+
             try {
                 const workItem = await createFailureWorkItem(
                     resolvedCollectionUri,

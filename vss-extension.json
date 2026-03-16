@@ -3,7 +3,7 @@
     "manifestVersion": 1,
     "id": "d365fo-copilot-code-review",
     "name": "D356FO Copilot Code Review",
-    "version": "1.2.18",
+    "version": "1.2.29",
     "publisher": "DiegoMancassola",
     "public": true,
     "targets": [

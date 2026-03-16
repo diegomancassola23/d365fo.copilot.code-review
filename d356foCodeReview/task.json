@@ -10,7 +10,7 @@
     "version": {
         "Major": 1,
         "Minor": 2,
-        "Patch": 18
+        "Patch": 29
     },
     "instanceNameFormat": "D356FO Copilot Code Review",
     "minimumAgentVersion": "2.182.1",
@@ -76,6 +76,14 @@
             "required": false,
             "defaultValue": "15",
             "helpMarkDown": "The maximum number of minutes to allow the Copilot review to run before timing out. Default is 15 minutes."
+        },
+        {
+            "name": "failOnBlockingFindings",
+            "type": "boolean",
+            "label": "Fail Pipeline on Blocking Findings",
+            "required": false,
+            "defaultValue": true,
+            "helpMarkDown": "When enabled, blocking findings fail the task/pipeline. When disabled, blocking findings are reported but the task completes successfully (report-only mode)."
         },
         {
             "name": "model",

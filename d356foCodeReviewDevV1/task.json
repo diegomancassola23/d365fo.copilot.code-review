@@ -1,190 +1,198 @@
 {
-    "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
-    "id": "5fe45e88-c466-4658-ad2f-f6735e8a601f",
-    "name": "d356foCodeReview",
-    "friendlyName": "D356FO Copilot Code Review",
-    "description": "Perform automated code reviews for VSTS/Azure DevOps gated check-ins using the official GitHub Copilot CLI",
-    "helpMarkDown": "[Learn more about this task](https://github.com/diegomancassola23/d365fo.copilot.code-review)",
-    "category": "Utility",
-    "author": "Diego Mancassola",
-    "version": {
-        "Major": 1,
-        "Minor": 2,
-        "Patch": 18
+  "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
+  "id": "1f2f6c9f-6a53-4e7f-9a26-cd84d4b6d0f1",
+  "name": "d356foCodeReviewDevV1",
+  "friendlyName": "D356FO Copilot Code Review (Dev)",
+  "description": "[Development Build] Perform automated code reviews for VSTS/Azure DevOps gated check-ins using the official GitHub Copilot CLI",
+  "helpMarkDown": "[Learn more about this task](https://github.com/diegomancassola23/d365fo.copilot.code-review)",
+  "category": "Utility",
+  "author": "Diego Mancassola",
+  "version": {
+    "Major": 1,
+    "Minor": 2,
+    "Patch": 29
+  },
+  "instanceNameFormat": "D356FO Copilot Code Review (Dev)",
+  "minimumAgentVersion": "2.182.1",
+  "inputs": [
+    {
+      "name": "githubPat",
+      "type": "string",
+      "label": "GitHub PAT",
+      "required": true,
+      "helpMarkDown": "Personal Access Token for GitHub with Copilot access. This token is used to authenticate with the GitHub Copilot CLI."
     },
-    "instanceNameFormat": "D356FO Copilot Code Review",
-    "minimumAgentVersion": "2.182.1",
-    "inputs": [
-        {
-            "name": "githubPat",
-            "type": "string",
-            "label": "GitHub PAT",
-            "required": true,
-            "helpMarkDown": "Personal Access Token for GitHub with Copilot access. This token is used to authenticate with the GitHub Copilot CLI."
-        },
-        {
-            "name": "azureDevOpsPat",
-            "type": "string",
-            "label": "Azure DevOps PAT",
-            "required": false,
-            "helpMarkDown": "Personal Access Token for Azure DevOps. Used to read build/change context for review generation. **Required for Azure DevOps Server (on-prem)**. For Azure DevOps Services (cloud), you can use the System Access Token instead by enabling the option below."
-        },
-        {
-            "name": "useSystemAccessToken",
-            "type": "boolean",
-            "label": "Use System Access Token",
-            "required": false,
-            "defaultValue": false,
-            "helpMarkDown": "When enabled, uses the pipeline's System.AccessToken (OAuth) instead of a PAT. This is the Microsoft-recommended authentication method for Azure DevOps Services. Not supported for Azure DevOps Server (on-prem)."
-        },
-        {
-            "name": "organization",
-            "type": "string",
-            "label": "Organization",
-            "required": false,
-            "defaultValue": "",
-            "helpMarkDown": "The Azure DevOps organization name for cloud-hosted instances (e.g., 'myorg' from https://dev.azure.com/myorg). For Azure DevOps Server (on-prem), use 'collectionUri' instead. If neither is specified, auto-detected from the pipeline context."
-        },
-        {
-            "name": "collectionUri",
-            "type": "string",
-            "label": "Collection URI",
-            "required": false,
-            "defaultValue": "",
-            "helpMarkDown": "The full Azure DevOps collection URI (e.g., 'https://dev.azure.com/myorg', 'https://tfs.contoso.com/tfs/DefaultCollection'). If not specified, will be automatically detected from System.CollectionUri. Use this for Azure DevOps Server (on-prem) installations."
-        },
-        {
-            "name": "project",
-            "type": "string",
-            "label": "Project",
-            "required": false,
-            "defaultValue": "$(System.TeamProject)",
-            "helpMarkDown": "The Azure DevOps project name. Defaults to $(System.TeamProject)."
-        },
-        {
-            "name": "repository",
-            "type": "string",
-            "label": "Repository",
-            "required": false,
-            "defaultValue": "$(Build.Repository.Name)",
-            "helpMarkDown": "The repository name where the pull request exists. Defaults to $(Build.Repository.Name)."
-        },
-        {
-            "name": "timeout",
-            "type": "string",
-            "label": "Timeout (minutes)",
-            "required": false,
-            "defaultValue": "15",
-            "helpMarkDown": "The maximum number of minutes to allow the Copilot review to run before timing out. Default is 15 minutes."
-        },
-        {
-            "name": "model",
-            "type": "string",
-            "label": "Copilot Model",
-            "required": false,
-            "defaultValue": "",
-            "helpMarkDown": "Optional. The Copilot model to use for the review (e.g., 'gpt-4', 'claude-sonnet'). If not specified, uses the default model."
-        },
-        {
-            "name": "promptFile",
-            "type": "filePath",
-            "label": "Custom Prompt File",
-            "required": false,
-            "defaultValue": "",
-            "helpMarkDown": "Optional. Path to a .txt file containing a custom prompt for Copilot. The file must exist and contain content."
-        },
-        {
-            "name": "prompt",
-            "type": "multiLine",
-            "label": "Custom Prompt",
-            "required": false,
-            "defaultValue": "",
-            "helpMarkDown": "Optional. A custom prompt to pass directly to Copilot. If both prompt and promptFile are specified, prompt takes precedence.",
-            "properties": {
-                "rows": "10",
-                "maxLength": "5000"
-            }
-        },
-        {
-            "name": "warningPrompt",
-            "type": "multiLine",
-            "label": "Warning Checks Prompt",
-            "required": false,
-            "defaultValue": "",
-            "helpMarkDown": "Optional. Additional review checks to treat as warnings only (non-blocking). Cannot be combined with promptRaw/promptFileRaw or legacy Custom Prompt inputs.",
-            "properties": {
-                "rows": "8",
-                "maxLength": "5000"
-            }
-        },
-        {
-            "name": "warningPromptFile",
-            "type": "filePath",
-            "label": "Warning Checks Prompt File",
-            "required": false,
-            "defaultValue": "",
-            "helpMarkDown": "Optional. Path to a .txt file containing warning-only checks. If both warningPrompt and warningPromptFile are set, warningPrompt takes precedence."
-        },
-        {
-            "name": "blockingPrompt",
-            "type": "multiLine",
-            "label": "Blocking Checks Prompt",
-            "required": false,
-            "defaultValue": "",
-            "helpMarkDown": "Optional. Additional review checks to treat as blocking. Violations should produce REJECTED result. Cannot be combined with promptRaw/promptFileRaw or legacy Custom Prompt inputs.",
-            "properties": {
-                "rows": "8",
-                "maxLength": "5000"
-            }
-        },
-        {
-            "name": "blockingPromptFile",
-            "type": "filePath",
-            "label": "Blocking Checks Prompt File",
-            "required": false,
-            "defaultValue": "",
-            "helpMarkDown": "Optional. Path to a .txt file containing blocking checks. If both blockingPrompt and blockingPromptFile are set, blockingPrompt takes precedence."
-        },
-        {
-            "name": "promptRaw",
-            "type": "multiLine",
-            "label": "Raw Prompt",
-            "required": false,
-            "defaultValue": "",
-            "helpMarkDown": "Optional. A raw prompt to pass directly to the Copilot CLI with no modification. Cannot be combined with other prompt inputs (prompt, promptFile, promptFileRaw).",
-            "properties": {
-                "rows": "10",
-                "maxLength": "5000"
-            }
-        },
-        {
-            "name": "promptFileRaw",
-            "type": "filePath",
-            "label": "Raw Prompt File",
-            "required": false,
-            "defaultValue": "",
-            "helpMarkDown": "Optional. Path to a file containing a raw prompt to pass directly to the Copilot CLI with no modification. Cannot be combined with other prompt inputs (prompt, promptFile, promptRaw)."
-        },
-        {
-            "name": "authors",
-            "type": "string",
-            "label": "Author Filter",
-            "required": false,
-            "defaultValue": "",
-            "helpMarkDown": "Optional. A comma-separated list of email addresses. If specified, the task will only run code reviews for PRs authored by users with matching email addresses. Uses $(Build.RequestedForEmail) for comparison."
-        }
-    ],
-    "execution": {
-        "Node20_1": {
-            "target": "index.js"
-        }
+    {
+      "name": "azureDevOpsPat",
+      "type": "string",
+      "label": "Azure DevOps PAT",
+      "required": false,
+      "helpMarkDown": "Personal Access Token for Azure DevOps. Used to read build/change context for review generation. **Required for Azure DevOps Server (on-prem)**. For Azure DevOps Services (cloud), you can use the System Access Token instead by enabling the option below."
     },
-    "restrictions": {
-        "commands": {
-            "mode": "restricted"
-        },
-        "settableVariables": {
-            "allowed": []
-        }
+    {
+      "name": "useSystemAccessToken",
+      "type": "boolean",
+      "label": "Use System Access Token",
+      "required": false,
+      "defaultValue": false,
+      "helpMarkDown": "When enabled, uses the pipeline's System.AccessToken (OAuth) instead of a PAT. This is the Microsoft-recommended authentication method for Azure DevOps Services. Not supported for Azure DevOps Server (on-prem)."
+    },
+    {
+      "name": "organization",
+      "type": "string",
+      "label": "Organization",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "The Azure DevOps organization name for cloud-hosted instances (e.g., 'myorg' from https://dev.azure.com/myorg). For Azure DevOps Server (on-prem), use 'collectionUri' instead. If neither is specified, auto-detected from the pipeline context."
+    },
+    {
+      "name": "collectionUri",
+      "type": "string",
+      "label": "Collection URI",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "The full Azure DevOps collection URI (e.g., 'https://dev.azure.com/myorg', 'https://tfs.contoso.com/tfs/DefaultCollection'). If not specified, will be automatically detected from System.CollectionUri. Use this for Azure DevOps Server (on-prem) installations."
+    },
+    {
+      "name": "project",
+      "type": "string",
+      "label": "Project",
+      "required": false,
+      "defaultValue": "$(System.TeamProject)",
+      "helpMarkDown": "The Azure DevOps project name. Defaults to $(System.TeamProject)."
+    },
+    {
+      "name": "repository",
+      "type": "string",
+      "label": "Repository",
+      "required": false,
+      "defaultValue": "$(Build.Repository.Name)",
+      "helpMarkDown": "The repository name where the pull request exists. Defaults to $(Build.Repository.Name)."
+    },
+    {
+      "name": "timeout",
+      "type": "string",
+      "label": "Timeout (minutes)",
+      "required": false,
+      "defaultValue": "15",
+      "helpMarkDown": "The maximum number of minutes to allow the Copilot review to run before timing out. Default is 15 minutes."
+    },
+    {
+      "name": "failOnBlockingFindings",
+      "type": "boolean",
+      "label": "Fail Pipeline on Blocking Findings",
+      "required": false,
+      "defaultValue": true,
+      "helpMarkDown": "When enabled, blocking findings fail the task/pipeline. When disabled, blocking findings are reported but the task completes successfully (report-only mode)."
+    },
+    {
+      "name": "model",
+      "type": "string",
+      "label": "Copilot Model",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Optional. The Copilot model to use for the review (e.g., 'gpt-4', 'claude-sonnet'). If not specified, uses the default model."
+    },
+    {
+      "name": "promptFile",
+      "type": "filePath",
+      "label": "Custom Prompt File",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Optional. Path to a .txt file containing a custom prompt for Copilot. The file must exist and contain content."
+    },
+    {
+      "name": "prompt",
+      "type": "multiLine",
+      "label": "Custom Prompt",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Optional. A custom prompt to pass directly to Copilot. If both prompt and promptFile are specified, prompt takes precedence.",
+      "properties": {
+        "rows": "10",
+        "maxLength": "5000"
+      }
+    },
+    {
+      "name": "warningPrompt",
+      "type": "multiLine",
+      "label": "Warning Checks Prompt",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Optional. Additional review checks to treat as warnings only (non-blocking). Cannot be combined with promptRaw/promptFileRaw or legacy Custom Prompt inputs.",
+      "properties": {
+        "rows": "8",
+        "maxLength": "5000"
+      }
+    },
+    {
+      "name": "warningPromptFile",
+      "type": "filePath",
+      "label": "Warning Checks Prompt File",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Optional. Path to a .txt file containing warning-only checks. If both warningPrompt and warningPromptFile are set, warningPrompt takes precedence."
+    },
+    {
+      "name": "blockingPrompt",
+      "type": "multiLine",
+      "label": "Blocking Checks Prompt",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Optional. Additional review checks to treat as blocking. Violations should produce REJECTED result. Cannot be combined with promptRaw/promptFileRaw or legacy Custom Prompt inputs.",
+      "properties": {
+        "rows": "8",
+        "maxLength": "5000"
+      }
+    },
+    {
+      "name": "blockingPromptFile",
+      "type": "filePath",
+      "label": "Blocking Checks Prompt File",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Optional. Path to a .txt file containing blocking checks. If both blockingPrompt and blockingPromptFile are set, blockingPrompt takes precedence."
+    },
+    {
+      "name": "promptRaw",
+      "type": "multiLine",
+      "label": "Raw Prompt",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Optional. A raw prompt to pass directly to the Copilot CLI with no modification. Cannot be combined with other prompt inputs (prompt, promptFile, promptFileRaw).",
+      "properties": {
+        "rows": "10",
+        "maxLength": "5000"
+      }
+    },
+    {
+      "name": "promptFileRaw",
+      "type": "filePath",
+      "label": "Raw Prompt File",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Optional. Path to a file containing a raw prompt to pass directly to the Copilot CLI with no modification. Cannot be combined with other prompt inputs (prompt, promptFile, promptRaw)."
+    },
+    {
+      "name": "authors",
+      "type": "string",
+      "label": "Author Filter",
+      "required": false,
+      "defaultValue": "",
+      "helpMarkDown": "Optional. A comma-separated list of email addresses. If specified, the task will only run code reviews for PRs authored by users with matching email addresses. Uses $(Build.RequestedForEmail) for comparison."
     }
+  ],
+  "execution": {
+    "Node20_1": {
+      "target": "index.js"
+    }
+  },
+  "restrictions": {
+    "commands": {
+      "mode": "restricted"
+    },
+    "settableVariables": {
+      "allowed": []
+    }
+  }
 }

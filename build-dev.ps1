@@ -78,6 +78,16 @@ $taskJson = Join-Path $prodTaskDir "task.json"
 if (Test-Path $taskJson) {
     $devTaskJson = Join-Path $devTaskDir "task.json"
     Copy-Item $taskJson -Destination $devTaskJson -Force
+
+    # Rewrite dev task identity to avoid collisions with production task definition
+    $devTaskDefinition = Get-Content -Raw -Path $devTaskJson | ConvertFrom-Json
+    $devTaskDefinition.id = "1f2f6c9f-6a53-4e7f-9a26-cd84d4b6d0f1"
+    $devTaskDefinition.name = "d356foCodeReviewDevV1"
+    $devTaskDefinition.friendlyName = "D356FO Copilot Code Review (Dev)"
+    $devTaskDefinition.instanceNameFormat = "D356FO Copilot Code Review (Dev)"
+    $devTaskDefinition.description = "[Development Build] Perform automated code reviews for VSTS/Azure DevOps gated check-ins using the official GitHub Copilot CLI"
+    $devTaskDefinition | ConvertTo-Json -Depth 100 | Set-Content -Path $devTaskJson -Encoding UTF8
+
     Write-Host "  Copied: task.json" -ForegroundColor Gray
 }
 else {
@@ -152,4 +162,4 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "`nNext steps:" -ForegroundColor White
 Write-Host "1. Upload the .vsix file to the Marketplace management portal" -ForegroundColor Gray
 Write-Host "2. Share the extension with your test organization" -ForegroundColor Gray
-Write-Host "3. Install and test in your pipelines using 'd356foCodeReview@0'" -ForegroundColor Gray
+Write-Host "3. Install and test in your pipelines using 'd356foCodeReviewDevV1@1'" -ForegroundColor Gray
