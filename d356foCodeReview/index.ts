@@ -513,20 +513,10 @@ async function createFailureWorkItem(
 
     tl.warning(`[WorkItemContext] Init -> ChangesetId: ${changesetId || 'none'}; Shelveset: ${shelveset || 'none'}; SourceVersion: ${sourceVersion || 'none'}`);
 
-    if (changesetId) {
-        try {
-            changeset = await getTfvcChangesetDetails(collectionUri, project, changesetId, token, authType);
-        } catch (error) {
-            console.log(`Warning: Failed to fetch changeset metadata for ${changesetId}: ${error instanceof Error ? error.message : String(error)}`);
-        }
-
-        try {
-            parentTaskId = await resolveParentTaskIdFromChangeset(collectionUri, project, changesetId, token, authType);
-        } catch (error) {
-            console.log(`Warning: Failed to resolve parent task from changeset ${changesetId}: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    }
-
+    // For gated builds the shelveset is the actual pending change.
+    // Build.SourceVersion points to the last committed changeset on the target branch (unrelated).
+    // Therefore, when a shelveset is present we resolve metadata and the parent task from it first,
+    // and only fall back to the changeset if the shelveset provides no result.
     if (shelveset) {
         try {
             shelvesetDetails = await getTfvcShelvesetDetails(collectionUri, project, shelveset, token, authType);
@@ -534,11 +524,25 @@ async function createFailureWorkItem(
             console.log(`Warning: Failed to fetch shelveset metadata for ${shelveset}: ${error instanceof Error ? error.message : String(error)}`);
         }
 
+        try {
+            parentTaskId = await resolveParentTaskIdFromShelveset(collectionUri, project, shelveset, token, authType);
+        } catch (error) {
+            console.log(`Warning: Failed to resolve parent task from shelveset ${shelveset}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    if (changesetId) {
+        try {
+            changeset = await getTfvcChangesetDetails(collectionUri, project, changesetId, token, authType);
+        } catch (error) {
+            console.log(`Warning: Failed to fetch changeset metadata for ${changesetId}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
         if (!parentTaskId) {
             try {
-                parentTaskId = await resolveParentTaskIdFromShelveset(collectionUri, project, shelveset, token, authType);
+                parentTaskId = await resolveParentTaskIdFromChangeset(collectionUri, project, changesetId, token, authType);
             } catch (error) {
-                console.log(`Warning: Failed to resolve parent task from shelveset ${shelveset}: ${error instanceof Error ? error.message : String(error)}`);
+                console.log(`Warning: Failed to resolve parent task from changeset ${changesetId}: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
     }
@@ -546,12 +550,14 @@ async function createFailureWorkItem(
     return new Promise((resolve, reject) => {
         const references = getReviewReferences();
         const sourceVersionForTitle = sourceVersion || 'unknown';
+        // Prefer shelveset comment/author: in a gated build the shelveset is the actual
+        // pending change, whereas the changeset is an unrelated prior commit on the branch.
         const checkinComment =
-            normalizeInput(changeset?.comment) ||
             normalizeInput(shelvesetDetails?.comment) ||
+            normalizeInput(changeset?.comment) ||
             sourceVersionMessage;
         const title = truncateForTitle(`Code Review - ${checkinComment || sourceVersionForTitle}`);
-        const assignedTo = resolveChangesetAuthor(changeset) || resolveShelvesetAuthor(shelvesetDetails);
+        const assignedTo = resolveShelvesetAuthor(shelvesetDetails) || resolveChangesetAuthor(changeset);
 
         tl.warning(`[WorkItemContext] SourceVersion: ${sourceVersionForTitle}; ChangesetId: ${changesetId || 'not resolved'}; Shelveset: ${shelveset || 'not resolved'}`);
         tl.warning(`[WorkItemContext] AssignedTo: ${assignedTo || 'not resolved'}; ParentTaskId: ${parentTaskId || 'not resolved'}; Title: ${title}`);
@@ -602,7 +608,7 @@ async function createFailureWorkItem(
                     rel: 'System.LinkTypes.Hierarchy-Reverse',
                     url: `${collectionUri}/_apis/wit/workItems/${parentTaskId}`,
                     attributes: {
-                        comment: 'Parent task linked from associated TFVC changeset work item.'
+                        comment: 'Parent task linked from associated TFVC shelveset or changeset work item.'
                     }
                 }
             });

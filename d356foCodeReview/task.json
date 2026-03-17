@@ -1,6 +1,6 @@
 {
     "$schema": "https://raw.githubusercontent.com/Microsoft/azure-pipelines-task-lib/master/tasks.schema.json",
-    "id": "5fe45e88-c466-4658-ad2f-f6735e8a601f",
+    "id": "bdbcc783-152a-4c58-a4a4-4e3dff3a19be",
     "name": "d356foCodeReview",
     "friendlyName": "D356FO Copilot Code Review",
     "description": "Perform automated code reviews for VSTS/Azure DevOps gated check-ins using the official GitHub Copilot CLI",
@@ -10,7 +10,7 @@
     "version": {
         "Major": 1,
         "Minor": 2,
-        "Patch": 29
+        "Patch": 32
     },
     "instanceNameFormat": "D356FO Copilot Code Review",
     "minimumAgentVersion": "2.182.1",

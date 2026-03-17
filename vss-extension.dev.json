@@ -3,7 +3,7 @@
     "manifestVersion": 1,
     "id": "d365fo-copilot-code-review-dev",
     "name": "D356FO Copilot Code Review",
-    "version": "1.2.29",
+    "version": "1.2.32",
     "publisher": "DiegoMancassola",
     "public": false,
     "targets": [
@@ -58,7 +58,7 @@
     ],
     "contributions": [
         {
-            "id": "copilot-code-review-dev-task",
+            "id": "d365fo-copilot-code-review-dev-task",
             "type": "ms.vss-distributed-task.task",
             "targets": [
                 "ms.vss-distributed-task.tasks"
