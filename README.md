@@ -1,7 +1,7 @@
 # d365fo.copilot.code-review
 
 ![Platform](https://img.shields.io/badge/platform-D365FO-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![Status](https://img.shields.io/badge/status-Development-yellow)
 
 AI-powered X++ code review integrated into Azure DevOps gated check-in pipelines.
